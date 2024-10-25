@@ -266,7 +266,7 @@ static inline void convolver_run(const float *src, float *dst,
 	sum[0] = _mm_setzero_ps();
 	for(i = 0; i < n_taps; i+=4) {
 		t[0] = _mm_loadu_ps(&src[i]);
-		sum[0] = _mm_add_ps(sum[0], _mm_mul_ps(_mm_loadu_ps(&taps[i]), t[0]));
+		sum[0] = _mm_add_ps(sum[0], _mm_mul_ps(_mm_load_ps(&taps[i]), t[0]));
 	}
 	sum[0] = _mm_add_ps(sum[0], _mm_movehl_ps(sum[0], sum[0]));
 	sum[0] = _mm_add_ss(sum[0], _mm_shuffle_ps(sum[0], sum[0], 0x55));
@@ -300,7 +300,12 @@ static inline void delay_convolve_run_sse(float *buffer, uint32_t *pos,
 			t[0] = _mm_loadu_ps(&buffer[w+o]);
 			t[0] = _mm_mul_ps(t[0], v);
 			_mm_store_ps(&dst[n], t[0]);
-			w = w + 4 >= n_buffer ? 0 : w + 4;
+			w += 4;
+			if (w >= n_buffer) {
+				w -= n_buffer;
+				t[0] = _mm_load_ps(&buffer[n_buffer]);
+				_mm_store_ps(&buffer[0], t[0]);
+			}
 		}
 		for(; n < n_samples; n++) {
 			t[0] = _mm_load_ss(&src[n]);
@@ -318,7 +323,12 @@ static inline void delay_convolve_run_sse(float *buffer, uint32_t *pos,
 			_mm_storeu_ps(&buffer[w+n_buffer], t[0]);
 			for(i = 0; i < 4; i++)
 				convolver_run(&buffer[w+o+i], &dst[n+i], taps, n_taps, v);
-			w = w + 4 >= n_buffer ? 0 : w + 4;
+			w += 4;
+			if (w >= n_buffer) {
+				w -= n_buffer;
+				t[0] = _mm_load_ps(&buffer[n_buffer]);
+				_mm_store_ps(&buffer[0], t[0]);
+			}
 		}
 		for(; n < n_samples; n++) {
 			t[0] = _mm_load_ss(&src[n]);
